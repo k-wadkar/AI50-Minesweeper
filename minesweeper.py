@@ -1,6 +1,6 @@
 import itertools
 import random
-
+from copy import deepcopy
 
 class Minesweeper():
     """
@@ -180,6 +180,45 @@ class MinesweeperAI():
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
 
+    def find_uncertain_neighbours(self, cell, count):
+        cellNeighbours = set()
+
+        # top left
+        if cell[0] > 0 and cell [1] > 0:
+            cellNeighbours.add((cell[0]-1, cell[1]-1))
+        # top centre
+        if cell[0] > 0:
+            cellNeighbours.add((cell[0]-1, cell[1]))
+        # top right
+        if cell[0] > 0 and cell [1] < self.width-1:
+            cellNeighbours.add((cell[0]-1, cell[1]+1))
+        # middle left
+        if cell [1] > 0:
+            cellNeighbours.add((cell[0], cell[1]-1))
+        # middle right
+        if cell[1] < self.width-1:
+            cellNeighbours.add((cell[0], cell[1]+1))
+        # bottom left
+        if cell[0] < self.height-1 and cell [1] > 0:
+            cellNeighbours.add((cell[0]+1, cell[1]-1))
+        # bottom centre
+        if cell[0] < self.height-1:
+            cellNeighbours.add((cell[0]+1, cell[1]))
+        # bottom right
+        if cell[0] < self.height-1 and cell[1] < self.width-1:
+            cellNeighbours.add((cell[0]+1, cell[1]+1))
+
+        neighboursCopy = deepcopy(cellNeighbours)
+
+        for individualCell in cellNeighbours:
+            if individualCell in self.mines:
+                neighboursCopy.remove(individualCell)
+                count -= 1
+            if individualCell in self.safes:
+                neighboursCopy.remove(individualCell)
+
+        return Sentence(neighboursCopy, count)
+
     def add_knowledge(self, cell, count):
         """
         Called when the Minesweeper board tells us, for a given
@@ -187,15 +226,41 @@ class MinesweeperAI():
 
         This function should:
             1) mark the cell as a move that has been made
+            Done
             2) mark the cell as safe
+            Done
             3) add a new sentence to the AI's knowledge base
                based on the value of `cell` and `count`
+            Done
             4) mark any additional cells as safe or as mines
                if it can be concluded based on the AI's knowledge base
+            
             5) add any new sentences to the AI's knowledge base
                if they can be inferred from existing knowledge
         """
-        raise NotImplementedError
+        # Marks the cell as a move that has been made
+        self.moves_made.add(cell)
+        # Marks the cell as a safe cell
+        self.mark_safe(cell)
+        # Finds the set of all neighbouring cells which have not yet been explored
+        # (Along with the number of mines known to be in that set) 
+        self.knowledge.append(self.find_uncertain_neighbours(cell, count))
+
+        # If we know the locations of specific mines in the unexplored set
+        sentCopy = deepcopy(self.find_uncertain_neighbours(cell, count))
+
+        if len(self.find_uncertain_neighbours(cell, count).known_mines()) != 0:
+            for mine in self.find_uncertain_neighbours(cell, count).known_mines():
+                self.mines.add(mine)
+                sentCopy.cells.remove(mine)
+                sentCopy.count -= 1
+            
+        if len(self.find_uncertain_neighbours(cell, count).known_safes()) != 0:
+            for safe in self.find_uncertain_neighbours(cell, count).known_safes():
+                self.safes.add(safe)
+                sentCopy.cells.remove(safe)
+
+        # self.knowledge.append(sentCopy)
 
     def make_safe_move(self):
         """
