@@ -118,22 +118,27 @@ class Sentence():
             return self.cells
         else:
             return set()
-        
-        raise NotImplementedError
 
     def mark_mine(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be a mine.
         """
-        raise NotImplementedError
+        for iterableCell in self.cells:
+            if iterableCell == cell:
+                self.count -= 1
+                self.cells.remove(cell)
+                break
 
     def mark_safe(self, cell):
         """
         Updates internal knowledge representation given the fact that
         a cell is known to be safe.
         """
-        raise NotImplementedError
+        for iterableCell in self.cells:
+            if iterableCell == cell:
+                self.cells.remove(cell)
+                break
 
 
 class MinesweeperAI():
