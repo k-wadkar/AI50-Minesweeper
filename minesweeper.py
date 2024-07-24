@@ -256,7 +256,8 @@ class MinesweeperAI():
 
     def knowledge_cleanup(self):
         '''
-        Removes duplicate sentences in self.knowledge 
+        Removes duplicate sentences in self.knowledge
+        Removes empty sentences
         '''
         # Will contain exactly one copy of the sentences which appear more than once in self.knowledge
         badList = []
@@ -278,6 +279,18 @@ class MinesweeperAI():
         
         # Set self.knowledge equal to goodlist plus badlist (i.e. the list containing exactly one copy of each sentence)
         self.knowledge = deepcopy(goodList+badList)
+
+
+        # Removes empty sentences
+        for sentence in self.knowledge:
+            if sentence.count == len(sentence.cells):
+                for cell in list(sentence.cells):
+                    self.mark_mine(cell)
+                self.knowledge.remove(sentence)
+            if sentence.count == 0:
+                for cell in list(sentence.cells):
+                    self.mark_safe(cell)
+                self.knowledge.remove(sentence)
 
     def add_knowledge(self, cell, count):
         """
