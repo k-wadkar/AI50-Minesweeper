@@ -234,33 +234,55 @@ class MinesweeperAI():
             Done
             4) mark any additional cells as safe or as mines
                if it can be concluded based on the AI's knowledge base
-            
+            Done?
             5) add any new sentences to the AI's knowledge base
                if they can be inferred from existing knowledge
+
         """
         # Marks the cell as a move that has been made
         self.moves_made.add(cell)
+
+
         # Marks the cell as a safe cell
         self.mark_safe(cell)
+
+
         # Finds the set of all neighbouring cells which have not yet been explored
         # (Along with the number of mines known to be in that set) 
+        cachedLocalKnowledge = deepcopy(self.knowledge) #Create a copy of localknowledge before it is altered
         self.knowledge.append(self.find_uncertain_neighbours(cell, count))
+
 
         # If we know the locations of specific mines in the unexplored set
         sentCopy = deepcopy(self.find_uncertain_neighbours(cell, count))
-
+            # If the number of neighbouring cells = number of neighbouring mines then mark cells as mines
         if len(self.find_uncertain_neighbours(cell, count).known_mines()) != 0:
             for mine in self.find_uncertain_neighbours(cell, count).known_mines():
                 self.mines.add(mine)
                 sentCopy.cells.remove(mine)
                 sentCopy.count -= 1
             
+            #Vice versa for neighbouring safes
         if len(self.find_uncertain_neighbours(cell, count).known_safes()) != 0:
             for safe in self.find_uncertain_neighbours(cell, count).known_safes():
                 self.safes.add(safe)
                 sentCopy.cells.remove(safe)
 
-        # self.knowledge.append(sentCopy)
+
+        # Now for set subtraction...
+        for iterableSentence in cachedLocalKnowledge:
+            # If there exists a sentence in knowledge which contains a cell set which is a subset 
+            if iterableSentence.cells.issubset(sentCopy.cells):
+                newSet = sentCopy.cells.difference(iterableSentence.cells)
+                newCount = sentCopy.count - iterableSentence.count
+                
+                self.knowledge.append(Sentence(newSet, newCount))
+
+            if sentCopy.cells.issubset(iterableSentence.cells):
+                newSet = iterableSentence.cells.difference(sentCopy.cells)
+                newCount = iterableSentence.count - sentCopy.count
+
+                self.knowledge.append(Sentence(newSet, newCount))
 
     def make_safe_move(self):
         """
