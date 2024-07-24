@@ -219,6 +219,28 @@ class MinesweeperAI():
 
         return Sentence(neighboursCopy, count)
 
+    def knowledge_cleanup(self):
+        # Will contain exactly one copy of the sentences which appear more than once in self.knowledge
+        badList = []
+        # Will contain exactly one copy of the sentences which appear only once in self.knowledge
+        goodList= []
+
+        # For each sentence in self.knowledge
+        for sentenceNum in range(len(self.knowledge)):
+            # For each sentence between the currently selected sentence and the end of self.knowledge
+            for nestedSentenceNum in range(sentenceNum+1, len(self.knowledge)):
+                # If the two selected sentences have the same cells and the sentence does not already appear in badlist, add to badlist
+                if self.knowledge[sentenceNum].cells == self.knowledge[nestedSentenceNum].cells and self.knowledge[sentenceNum] not in badList:
+                    badList.append(self.knowledge[sentenceNum])
+        
+        # For each sentence not in badlist (i.e. sentences which only appeared once) add to goodlist
+        for sentence in self.knowledge:
+            if sentence not in badList:
+                goodList.append(sentence)
+        
+        # Set self.knowledge equal to goodlist plus badlist (i.e. the list containing exactly one copy of each sentence)
+        self.knowledge = deepcopy(goodList+badList)
+
     def add_knowledge(self, cell, count):
         """
         Called when the Minesweeper board tells us, for a given
@@ -276,13 +298,29 @@ class MinesweeperAI():
                 newSet = sentCopy.cells.difference(iterableSentence.cells)
                 newCount = sentCopy.count - iterableSentence.count
                 
-                self.knowledge.append(Sentence(newSet, newCount))
+                if newCount == 0:
+                    for safe in newSet:
+                        self.mark_safe(safe)
+                elif newCount == len(newSet):
+                    for mine in newSet:
+                        self.mark_mine(mine)
+                else:
+                    self.knowledge.append(Sentence(newSet, newCount))
 
             if sentCopy.cells.issubset(iterableSentence.cells):
                 newSet = iterableSentence.cells.difference(sentCopy.cells)
                 newCount = iterableSentence.count - sentCopy.count
 
-                self.knowledge.append(Sentence(newSet, newCount))
+                if newCount == 0:
+                    for safe in newSet:
+                        self.mark_safe(safe)
+                elif newCount == len(newSet):
+                    for mine in newSet:
+                        self.mark_mine(mine)
+                else:
+                    self.knowledge.append(Sentence(newSet, newCount))
+
+        self.knowledge_cleanup()
 
     def make_safe_move(self):
         """
