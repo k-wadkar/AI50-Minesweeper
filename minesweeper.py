@@ -181,8 +181,25 @@ class MinesweeperAI():
             sentence.mark_safe(cell)
 
     def find_uncertain_neighbours(self, cell, count):
+        '''
+        Takes a cell as input, along with the number of mines known to be neighbouring that cell
+        Produces a set of all cells that neighbour the input cell
+        Removes cells from the set if they are already known to be safes or mines and updates count accordingly
+        Based on the remaining number of cells in the set and count value:
+            If the number of neighbouring cells equal the number of remaining mines around the cell
+                Then mark all remaining neighbours as mines and return an empty set
+            If the number of mines in the remaining set if zero
+                Then mark all remaining neighbours as safes and return an empty set
+            Else
+                Return a sentence containing the remaining neighbours against the remaining mine count
+        '''
+        
+        # Set to contain coordinates of all neighbouring cells of which the status is uncertain
+        # (i.e. we don't know if it is safe or a mine)
         cellNeighbours = set()
 
+        # Adds all possible neighbouring cells to the set, given the input cell's location
+        # (i.e. it is not possible for a cell in the top row to have a neighbour above it, etc.)
         # top left
         if cell[0] > 0 and cell [1] > 0:
             cellNeighbours.add((cell[0]-1, cell[1]-1))
@@ -208,8 +225,10 @@ class MinesweeperAI():
         if cell[0] < self.height-1 and cell[1] < self.width-1:
             cellNeighbours.add((cell[0]+1, cell[1]+1))
 
+        #Deepcopy made as changing a set within the loop causes an error
         neighboursCopy = deepcopy(cellNeighbours)
 
+        # If a neighbour is already known to be a mine or safe, it is removed from the set and count is changed accordingly
         for individualCell in cellNeighbours:
             if individualCell in self.mines:
                 neighboursCopy.remove(individualCell)
@@ -217,9 +236,28 @@ class MinesweeperAI():
             if individualCell in self.safes:
                 neighboursCopy.remove(individualCell)
 
-        return Sentence(neighboursCopy, count)
+        # cellNeighbours now updated to exclude known mines and safes
+        cellNeighbours = deepcopy(neighboursCopy)
+        # If every remaining neighbour is known to be a safe
+        if count == 0:
+            # Add all neighbours to safes and return none
+            for neighbour in cellNeighbours:
+                self.mark_safe(neighbour)
+            return Sentence(set(), None)
+        # If every remaining neighbour is known to be a mine
+        elif count == len(cellNeighbours):
+            # Add all neighbours to mines and return none
+            for neighbour in cellNeighbours:
+                self.mark_mine(neighbour)
+            return Sentence(set(), None)
+        else:
+            # Otherwise just return a sentence of neighbour cells against number of mines
+            return Sentence(cellNeighbours, count)
 
     def knowledge_cleanup(self):
+        '''
+        Removes duplicate sentences in self.knowledge 
+        '''
         # Will contain exactly one copy of the sentences which appear more than once in self.knowledge
         badList = []
         # Will contain exactly one copy of the sentences which appear only once in self.knowledge
@@ -261,65 +299,60 @@ class MinesweeperAI():
                if they can be inferred from existing knowledge
 
         """
-        # Marks the cell as a move that has been made
+        # Marks the input cell as a move that has been made
         self.moves_made.add(cell)
 
 
-        # Marks the cell as a safe cell
+        # Marks the input cell as a safe cell
         self.mark_safe(cell)
 
 
-        # Finds the set of all neighbouring cells which have not yet been explored
-        # (Along with the number of mines known to be in that set) 
-        cachedLocalKnowledge = deepcopy(self.knowledge) #Create a copy of localknowledge before it is altered
-        self.knowledge.append(self.find_uncertain_neighbours(cell, count))
+        # (Creates a copy of self.knowledge before it is altered)
+        cachedLocalKnowledge = deepcopy(self.knowledge)
 
 
-        # If we know the locations of specific mines in the unexplored set
-        sentCopy = deepcopy(self.find_uncertain_neighbours(cell, count))
-            # If the number of neighbouring cells = number of neighbouring mines then mark cells as mines
-        if len(self.find_uncertain_neighbours(cell, count).known_mines()) != 0:
-            for mine in self.find_uncertain_neighbours(cell, count).known_mines():
-                self.mines.add(mine)
-                sentCopy.cells.remove(mine)
-                sentCopy.count -= 1
-            
-            #Vice versa for neighbouring safes
-        if len(self.find_uncertain_neighbours(cell, count).known_safes()) != 0:
-            for safe in self.find_uncertain_neighbours(cell, count).known_safes():
-                self.safes.add(safe)
-                sentCopy.cells.remove(safe)
+        # Variable to improve readability
+        uncertainNeighbours = deepcopy(self.find_uncertain_neighbours(cell, count))
 
 
-        # Now for set subtraction...
-        for iterableSentence in cachedLocalKnowledge:
-            # If there exists a sentence in knowledge which contains a cell set which is a subset 
-            if iterableSentence.cells.issubset(sentCopy.cells):
-                newSet = sentCopy.cells.difference(iterableSentence.cells)
-                newCount = sentCopy.count - iterableSentence.count
-                
-                if newCount == 0:
-                    for safe in newSet:
-                        self.mark_safe(safe)
-                elif newCount == len(newSet):
-                    for mine in newSet:
-                        self.mark_mine(mine)
-                else:
-                    self.knowledge.append(Sentence(newSet, newCount))
+        # If there are neighbouring cells which we don't already know the state of
+        # AND we don't know for sure based on count whether or not they are mines 
+        if uncertainNeighbours.count != None:
+            # Add a sentence based on this information to self.knowledge
+            self.knowledge.append(uncertainNeighbours)
 
-            if sentCopy.cells.issubset(iterableSentence.cells):
-                newSet = iterableSentence.cells.difference(sentCopy.cells)
-                newCount = iterableSentence.count - sentCopy.count
+            # Now for set subtraction...
+            for iterableSentence in cachedLocalKnowledge:
+                # If there exists a sentence in knowledge which contains a cell set which is a subset 
+                if iterableSentence.cells.issubset(uncertainNeighbours.cells):
 
-                if newCount == 0:
-                    for safe in newSet:
-                        self.mark_safe(safe)
-                elif newCount == len(newSet):
-                    for mine in newSet:
-                        self.mark_mine(mine)
-                else:
-                    self.knowledge.append(Sentence(newSet, newCount))
+                    newSet = uncertainNeighbours.cells.difference(iterableSentence.cells)
+                    newCount = uncertainNeighbours.count - iterableSentence.count
+                    
+                    if newCount == 0:
+                        for safe in newSet:
+                            self.mark_safe(safe)
+                    elif newCount == len(newSet):
+                        for mine in newSet:
+                            self.mark_mine(mine)
+                    else:
+                        self.knowledge.append(Sentence(newSet, newCount))
 
+                if uncertainNeighbours.cells.issubset(iterableSentence.cells):
+                    newSet = iterableSentence.cells.difference(uncertainNeighbours.cells)
+                    newCount = iterableSentence.count - uncertainNeighbours.count
+
+                    if newCount == 0:
+                        for safe in newSet:
+                            self.mark_safe(safe)
+                    elif newCount == len(newSet):
+                        for mine in newSet:
+                            self.mark_mine(mine)
+                    else:
+                        self.knowledge.append(Sentence(newSet, newCount))
+
+
+        # Remove duplicates
         self.knowledge_cleanup()
 
     def make_safe_move(self):
