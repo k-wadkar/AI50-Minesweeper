@@ -385,11 +385,13 @@ class MinesweeperAI():
         This function may use the knowledge in self.mines, self.safes
         and self.moves_made, but should not modify any of those values.
         """
-        
         untouchedSafes = self.safes.difference(self.moves_made)
         
-        for safe in untouchedSafes:
-            return safe
+        if untouchedSafes == set():
+            return None
+        else:
+            for safe in untouchedSafes:
+                return safe
 
     def make_random_move(self):
         """
@@ -398,8 +400,17 @@ class MinesweeperAI():
             1) have not already been chosen, and
             2) are not known to be mines
         """
-        while True:
-            randomCoords = (random.randrange(self.height), random.randrange(self.width))
 
-            if randomCoords not in self.moves_made and randomCoords not in self.mines:
-                return randomCoords
+        allCells = set()
+
+        for y in range(self.height):
+            for x in range(self.width):
+                allCells.add((y, x))
+
+        remainingCells = allCells.difference(self.moves_made.union(self.mines))
+
+        if remainingCells == set():
+            return None
+        else:
+            for cell in remainingCells:
+                return cell
