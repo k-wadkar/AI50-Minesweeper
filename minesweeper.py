@@ -287,10 +287,22 @@ class MinesweeperAI():
                 for cell in list(sentence.cells):
                     self.mark_mine(cell)
                 self.knowledge.remove(sentence)
-            if sentence.count == 0:
+            elif sentence.count == 0:
                 for cell in list(sentence.cells):
                     self.mark_safe(cell)
-                self.knowledge.remove(sentence)
+                self.knowledge.remove(sentence)            
+
+    def blanket_set_subtraction(self):
+        # Set subtraction
+        originalLength = len(self.knowledge)
+        for sentenceNum in range(len(self.knowledge)):
+            firstSet = self.knowledge[sentenceNum]
+            for nestedSentenceNum in range(sentenceNum+1, originalLength):
+                secondSet = self.knowledge[nestedSentenceNum]
+                if firstSet.cells.issubset(secondSet.cells):
+                    self.knowledge.append(Sentence(secondSet.cells.difference(firstSet.cells), secondSet.count-firstSet.count))
+                elif secondSet.cells.issubset(firstSet.cells):
+                    self.knowledge.append(Sentence(firstSet.cells.difference(secondSet.cells), firstSet.count - secondSet.count))
 
     def add_knowledge(self, cell, count):
         """
@@ -320,11 +332,8 @@ class MinesweeperAI():
         self.mark_safe(cell)
 
 
-        # (Creates a copy of self.knowledge before it is altered)
-        cachedLocalKnowledge = deepcopy(self.knowledge)
-
-
-        # Variable to improve readability
+        # Contains a sentence regarding neighbours to the input cell, of which we are not sure of the status
+            # (i.e we don't know if the neighbours are mines or safes)
         uncertainNeighbours = deepcopy(self.find_uncertain_neighbours(cell, count))
 
 
@@ -334,38 +343,43 @@ class MinesweeperAI():
             # Add a sentence based on this information to self.knowledge
             self.knowledge.append(uncertainNeighbours)
 
-            # Now for set subtraction...
-            for iterableSentence in cachedLocalKnowledge:
-                # If there exists a sentence in knowledge which contains a cell set which is a subset 
-                if iterableSentence.cells.issubset(uncertainNeighbours.cells):
+            # # Now for set subtraction...
+            # for iterableSentence in cachedLocalKnowledge:
+            #     # If there exists a sentence in knowledge which contains a cell set which is a subset 
+            #     if iterableSentence.cells.issubset(uncertainNeighbours.cells):
 
-                    newSet = uncertainNeighbours.cells.difference(iterableSentence.cells)
-                    newCount = uncertainNeighbours.count - iterableSentence.count
+            #         newSet = uncertainNeighbours.cells.difference(iterableSentence.cells)
+            #         newCount = uncertainNeighbours.count - iterableSentence.count
                     
-                    if newCount == 0:
-                        for safe in newSet:
-                            self.mark_safe(safe)
-                    elif newCount == len(newSet):
-                        for mine in newSet:
-                            self.mark_mine(mine)
-                    else:
-                        self.knowledge.append(Sentence(newSet, newCount))
+            #         if newCount == 0:
+            #             for safe in newSet:
+            #                 self.mark_safe(safe)
+            #         elif newCount == len(newSet):
+            #             for mine in newSet:
+            #                 self.mark_mine(mine)
+            #         else:
+            #             self.knowledge.append(Sentence(newSet, newCount))
 
-                if uncertainNeighbours.cells.issubset(iterableSentence.cells):
-                    newSet = iterableSentence.cells.difference(uncertainNeighbours.cells)
-                    newCount = iterableSentence.count - uncertainNeighbours.count
+            #     if uncertainNeighbours.cells.issubset(iterableSentence.cells):
+            #         newSet = iterableSentence.cells.difference(uncertainNeighbours.cells)
+            #         newCount = iterableSentence.count - uncertainNeighbours.count
 
-                    if newCount == 0:
-                        for safe in newSet:
-                            self.mark_safe(safe)
-                    elif newCount == len(newSet):
-                        for mine in newSet:
-                            self.mark_mine(mine)
-                    else:
-                        self.knowledge.append(Sentence(newSet, newCount))
+            #         if newCount == 0:
+            #             for safe in newSet:
+            #                 self.mark_safe(safe)
+            #         elif newCount == len(newSet):
+            #             for mine in newSet:
+            #                 self.mark_mine(mine)
+            #         else:
+            #             self.knowledge.append(Sentence(newSet, newCount))
 
 
-        # Remove duplicates
+        # Remove duplicates and empty sentences in self.knowledge
+        self.knowledge_cleanup()
+
+        # Runs set subtraction on all sets in self.knowledge
+        self.blanket_set_subtraction()
+
         self.knowledge_cleanup()
 
     def make_safe_move(self):
